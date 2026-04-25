@@ -4,6 +4,7 @@ library(arrow)
 library(testthat)
 library(viridis)
 library(scales)
+library(survival)
 
 dir_ls(glob = "*.parquet") %>% file_info() %>% select(path, size)
 
@@ -150,6 +151,17 @@ ggplot(surv_df, aes(y = reorder(pid, cancer_outcome_days), x = cancer_outcome_da
   scale_x_continuous(breaks = pretty_breaks(10))
 
 
-enc %>%
-  filter(str_detect(tolower(encounter_type), "death|died")) %>%
-  count(encounter_type)
+# make a survival analysis
+surv_df <- surv_df %>%
+  mutate(
+    surv_obj = Surv(time = cancer_outcome_days, event = death_outcome)
+  )
+
+km_fit <- survfit(surv_obj ~ 1, data = surv_df)
+km_fit
+
+plot(km_fit, xlab = "Days", ylab = "Survival Probability", col = "blue", lwd = 2)
+
+coxph_fit <- coxph(surv_obj ~ 1, data = surv_df)
+summary(coxph_fit)
+coef(coxph_fit)
