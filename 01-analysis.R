@@ -2,9 +2,9 @@ library(tidyverse)
 library(fs)
 library(arrow)
 library(testthat)
-library(viridis)
 library(scales)
 library(survival)
+library(lubridate)
 
 dir_ls(glob = "*.parquet") %>% file_info() %>% select(path, size)
 
@@ -17,6 +17,7 @@ pat <- read_parquet("patients-2026-04-25.parquet")
 enc <- read_parquet("encounters-2026-04-25.parquet")
 enc
 
+pat
 
 # data validation ---------------------------------------------------------
 
@@ -51,7 +52,8 @@ test_that("validation checks on patient_id", {
 
 pat <- pat %>% arrange(patient_id) %>% mutate(pid = row_number()) %>%
   select(pid, everything()) %>%
-  select(-patient_id)
+  select(-patient_id) %>%
+  mutate(birthDate = as.Date(birthDate))
 
 cond <- cond %>% 
   arrange(patient_id) %>%
@@ -118,9 +120,12 @@ cond_lung_patient <- cond_lung2 %>%
   mutate(cancer_last_days = as.integer(last_onset_date - lung_cancer_onset)) %>%
   print
 
+pid %>%
+  select()
+
 enc %>% filter(pid == 214) %>% tail(5)
 
-surv_df <- cond_lung_patient %>%
+surv_df0 <- cond_lung_patient %>%
   left_join(
     enc %>%
       filter(encounter_type == "Death Certification") %>%
@@ -137,6 +142,15 @@ surv_df <- cond_lung_patient %>%
     cancer_outcome_days = as.integer(last_date - lung_cancer_onset)
     )
 
+surv_df <- surv_df0 %>%
+  left_join(pat %>% select(pid, birthDate, gender), by = "pid") %>%
+  mutate(
+    surv_obj = Surv(time = cancer_outcome_days, event = death_outcome),
+    onset_age = date
+  )
+
+surv_df
+
 ggplot(surv_df, aes(y = reorder(pid, cancer_outcome_days), x = cancer_outcome_days)) +
   geom_point(aes(color = factor(death_outcome))) +
   theme_bw() +
@@ -151,11 +165,6 @@ ggplot(surv_df, aes(y = reorder(pid, cancer_outcome_days), x = cancer_outcome_da
   scale_x_continuous(breaks = pretty_breaks(10))
 
 
-# make a survival analysis
-surv_df <- surv_df %>%
-  mutate(
-    surv_obj = Surv(time = cancer_outcome_days, event = death_outcome)
-  )
 
 km_fit <- survfit(surv_obj ~ 1, data = surv_df)
 km_fit
@@ -165,3 +174,6 @@ plot(km_fit, xlab = "Days", ylab = "Survival Probability", col = "blue", lwd = 2
 coxph_fit <- coxph(surv_obj ~ 1, data = surv_df)
 summary(coxph_fit)
 coef(coxph_fit)
+
+coxph_fit2 <- coxph(surv_obj ~ gender, data = surv_df)
+summary(coxph_fit2)
