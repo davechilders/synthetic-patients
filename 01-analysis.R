@@ -5,22 +5,21 @@ library(testthat)
 library(scales)
 library(survival)
 library(lubridate)
+library(gt)
+library(survminer)
+
+# check files -------------------------------------------------------------
+
 
 dir_ls(glob = "*.parquet") %>% file_info() %>% select(path, size)
-
-
 
 # load --------------------------------------------------------------------
 
 cond <- read_parquet("conditions-2026-04-25.parquet")
 pat <- read_parquet("patients-2026-04-25.parquet")
 enc <- read_parquet("encounters-2026-04-25.parquet")
-enc
-
-pat
 
 # data validation ---------------------------------------------------------
-
 
 test_that("validation checks on patient_id", {
   
@@ -48,8 +47,9 @@ test_that("validation checks on patient_id", {
 )
 
 
-# analyze -----------------------------------------------------------------
+# create data set for lung cancer patients -----------------------------------------------------------------
 
+# shorter patient IDs
 pat <- pat %>% arrange(patient_id) %>% mutate(pid = row_number()) %>%
   select(pid, everything()) %>%
   select(-patient_id) %>%
@@ -67,23 +67,16 @@ enc <- enc %>%
   select(pid, everything()) %>%
   select(-patient_id)
 
-pat
-cond
-enc
-
-pat
-
 cond_lung <- cond %>%
   semi_join(
     cond %>% filter(str_detect(tolower(condition_text), "lung cancer")),
     by = "pid"
-  ) %>%
-  print
+  ) 
 
-cond_lung %>%
-  filter(str_detect(tolower(condition_text), "cancer")) %>%
-  split(.$pid) %>%
-  knitr::kable()
+# cond_lung %>%
+#   filter(str_detect(tolower(condition_text), "cancer")) %>%
+#   split(.$pid) %>%
+#   knitr::kable()
 
 cond_lung2 <- cond_lung %>%
   mutate(
@@ -93,21 +86,6 @@ cond_lung2 <- cond_lung %>%
   mutate(is_last = row_number() == n()) %>%
   ungroup() %>%
   filter(lung_cancer | is_last)
-
-cond_lung2 %>%
-  filter(pid == 19)
-
-cond %>% filter(pid == 19, str_detect(tolower(condition_text), "cancer"))
-cond %>% filter(pid == 19) %>% knitr::kable()
-
-cond_lung2 %>%
-  mutate(
-    days_since_suspect = ifelse(condition_text == "Suspected lung cancer (situation)", 0, NA)
-  ) %>%
-  group_by(pid) %>%
-  mutate(days_since_suspect = as.integer(onset_date - min(onset_date))) %>%
-  ungroup() %>%
-  View
 
 cond_lung_patient <- cond_lung2 %>%
   group_by(pid) %>%
@@ -119,11 +97,6 @@ cond_lung_patient <- cond_lung2 %>%
   ) %>%
   mutate(cancer_last_days = as.integer(last_onset_date - lung_cancer_onset)) %>%
   print
-
-pid %>%
-  select()
-
-enc %>% filter(pid == 214) %>% tail(5)
 
 surv_df0 <- cond_lung_patient %>%
   left_join(
@@ -146,11 +119,10 @@ surv_df <- surv_df0 %>%
   left_join(pat %>% select(pid, birthDate, gender), by = "pid") %>%
   mutate(
     surv_obj = Surv(time = cancer_outcome_days, event = death_outcome),
-    onset_age = date
+    onset_age = time_length(interval(birthDate, lung_cancer_onset), "year")
   )
 
-surv_df
-
+# view survival outcomes 
 ggplot(surv_df, aes(y = reorder(pid, cancer_outcome_days), x = cancer_outcome_days)) +
   geom_point(aes(color = factor(death_outcome))) +
   theme_bw() +
@@ -164,16 +136,28 @@ ggplot(surv_df, aes(y = reorder(pid, cancer_outcome_days), x = cancer_outcome_da
   ) +
   scale_x_continuous(breaks = pretty_breaks(10))
 
-
-
+# kaplan meier curve
 km_fit <- survfit(surv_obj ~ 1, data = surv_df)
-km_fit
 
 plot(km_fit, xlab = "Days", ylab = "Survival Probability", col = "blue", lwd = 2)
 
-coxph_fit <- coxph(surv_obj ~ 1, data = surv_df)
-summary(coxph_fit)
-coef(coxph_fit)
+ggsurvplot(km_fit, data = surv_df, conf.int = TRUE, risk.table = TRUE)
 
-coxph_fit2 <- coxph(surv_obj ~ gender, data = surv_df)
-summary(coxph_fit2)
+# age is only covariates
+coxph_fit <- coxph(surv_obj ~ onset_age, data = surv_df)
+coxph_output <- broom::tidy(coxph_fit, conf.int = TRUE, exponentiate = TRUE)
+
+gt(coxph_output %>% 
+     select(term, estimate, conf.low, conf.high, p.value)
+   ) %>%
+  tab_header(
+    "Time to Death following Lunch Cancer Diagnosis",
+    subtitle = "Cox Proportional Hazards Model"
+  ) %>%
+  fmt_number(columns = estimate:p.value) %>%
+  cols_label(
+    term = "Covariate",
+    estimate = "Haz Ratio",
+    conf.low = "Lower 95% CI",
+    conf.high = "Upper 95% CI"
+  )
