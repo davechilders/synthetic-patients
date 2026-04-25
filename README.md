@@ -12,7 +12,6 @@ for Synthea setup instructions.
 $ git --version
 $ java --version
 $ git clone https://github.com/synthetichealth/synthea.git
-$ nano synthea.properties.override
 $ ./run_synthea -p 500
 $ ls output/fhir/*.json | wc -l
 ```
