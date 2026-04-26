@@ -16,7 +16,7 @@ This report demonstrates an end-to-end workflow for transforming synthetic EHR d
 
 Specifically, this analysis:
 
-  - ingests structured data derived from synthetic EHR records (Synthea)
+  - [ingests](https://github.com/davechilders/synthetic-patients/blob/main/0-r-pipeline.R) structured data derived from synthetic EHR records (Synthea)
   - constructs a patient-level dataset with time-to-event outcomes
   - applies survival analysis methods to estimate time from diagnosis to death
   
