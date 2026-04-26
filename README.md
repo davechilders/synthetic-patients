@@ -17,7 +17,7 @@ See the bottom of this README for Synthea setup and data generation instructions
 This [script](https://github.com/davechilders/synthetic-patients/blob/main/01-analysis.R) processes the synthetic JSON data into 
 parquet files for patients, conditions, and encounters.
 
-This [report](https://github.com/davechilders/synthetic-patients/blob/main/01-analysis.R)] joins the data sources and presents a
+This Quarto [report](https://github.com/davechilders/synthetic-patients/blob/main/01-analysis.R) joins the data sources and presents a
 (very simplified) survival analysis for lung cancer patients.
 
 ### Synthea
