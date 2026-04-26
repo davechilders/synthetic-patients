@@ -113,7 +113,7 @@ surv_df0 <- cond_lung_patient %>%
       TRUE ~ as.Date("2026-04-24")
       ),
     cancer_outcome_days = as.integer(last_date - lung_cancer_onset)
-    )
+    ) %>% print
 
 surv_df <- surv_df0 %>%
   left_join(pat %>% select(pid, birthDate, gender), by = "pid") %>%
