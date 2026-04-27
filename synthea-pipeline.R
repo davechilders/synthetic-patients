@@ -18,9 +18,6 @@ files <- dir_ls(
   glob = "*.json"
 )
 
-files2 <- files[!grepl("hospital|practioner", files, ignore.case = TRUE)]
-
-
 # method 2: extract all resources -----------------------------------------
 
 extract_resources <- function(file) {
