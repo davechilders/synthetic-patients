@@ -20,36 +20,8 @@ files <- dir_ls(
 
 files2 <- files[!grepl("hospital|practioner", files, ignore.case = TRUE)]
 
-# method 1: patients only -------------------------------------------------
-
-extract_patient <- function(file) {
-  bundle <- fromJSON(file, simplifyVector = FALSE)
-  entries <- bundle$entry
-  
-  patients <- list()
-  
-  for (e in entries) {
-    resource <- e$resource
-    if (resource$resourceType == "Patient") {
-      patients <- append(patients, list(resource))
-    }
-  }
-  
-  map_dfr(patients, function(p) {
-    tibble(
-      patient_id = p$id,
-      gender = p$gender,
-      birthDate = p$birthDate
-    )
-  })
-}
-
-patients_df <- map_dfr(files, extract_patient)
-patients_df
-
 
 # method 2: extract all resources -----------------------------------------
-
 
 extract_resources <- function(file) {
   bundle <- fromJSON(file, simplifyVector = FALSE)
@@ -131,11 +103,6 @@ encounters_df <- map_dfr(files, function(file) {
   })
 })
 
-patients_df
-patients_df %>% count(state)
-conditions_df
-encounters_df
-
 conditions_df <- conditions_df %>%
   mutate(patient_id = str_remove_all(patient_id, "urn:uuid:"))
 
@@ -148,11 +115,6 @@ encounters_df <- encounters_df %>%
 encounters_df %>% distinct(patient_id) %>% nrow
 encounters_df %>% inner_join(patients_df, by = "patient_id") %>% distinct(patient_id) %>% nrow
 conditions_df %>% inner_join(patients_df, by = "patient_id") %>% distinct(patient_id) %>% nrow
-
-
-patients_df
-encounters_df
-conditions_df
 
 write_parquet(
   patients_df,
