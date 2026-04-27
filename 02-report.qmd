@@ -16,13 +16,17 @@ This report demonstrates an end-to-end workflow for transforming synthetic EHR d
 
 Specifically, this analysis:
 
-  - [ingests](https://github.com/davechilders/synthetic-patients/blob/main/0-r-pipeline.R) structured data derived from synthetic EHR records (Synthea)
-  - constructs a patient-level dataset with time-to-event outcomes
-  - applies survival analysis methods to estimate time from diagnosis to death
-  
+- [ingests](https://github.com/davechilders/synthetic-patients/blob/main/synthea-pipeline.R) structured data derived from synthetic EHR records (Synthea)
+- constructs a patient-level dataset with time-to-event outcomes
+- applies survival analysis methods to estimate time from diagnosis to death
+
 ## Data Source
 
 Data for this analysis was generated using Synthea, a synthetic patient generator that produces realistic EHR-style records. The raw JSON output was processed into parquet files (`patients`, `conditions`, `encounters`) prior to this analysis.
+
+The R code in this script can be viewed by clicking on `Code`.
+
+The R script for turning synthetic EHR JSON data into tabular parquet files can be viewed on Github [here](https://github.com/davechilders/synthetic-patients/blob/main/synthea-pipeline.R).
 
 ```{r load_data}
 library(tidyverse)
@@ -100,13 +104,13 @@ enc <- enc %>%
 
 The analysis dataset includes:
 
-- `pid`: patient identifier  
-- `cancer_onset`: date of lung cancer diagnosis  
-- `death_date`: recorded date of death (if applicable)  
-- `last_date`: censoring date (death or end of observation)  
-- `outcome_days`: time from diagnosis to last_date  
-- `onset_age`: age at diagnosis  
-- `surv_obj`: survival object combining time and event indicator  
+- `pid`: patient identifier\
+- `cancer_onset`: date of lung cancer diagnosis\
+- `death_date`: recorded date of death (if applicable)\
+- `last_date`: censoring date (death or end of observation)\
+- `outcome_days`: time from diagnosis to last_date\
+- `onset_age`: age at diagnosis\
+- `surv_obj`: survival object combining time and event indicator
 
 Patients were included if they had a recorded diagnosis of non-small cell lung cancer.
 
@@ -175,10 +179,7 @@ head(surv_df) %>%
 
 The plot below shows time from diagnosis to either death or censoring for each patient.
 
-Key observations:
-- The cohort contains 11 patients
-- Time is measured relative to each patient’s diagnosis date (time zero)
-- With a small sample size, time to event fully separates observed outcomes
+Key observations: - The cohort contains 11 patients - Time is measured relative to each patient’s diagnosis date (time zero) - With a small sample size, time to event fully separates observed outcomes
 
 ```{r view_survival_outcomes}
 # view survival outcomes 
@@ -196,7 +197,7 @@ ggplot(surv_df, aes(y = reorder(pid, outcome_days), x = outcome_days)) +
   scale_x_continuous(breaks = pretty_breaks(10))
 ```
 
-We will plot a Kaplan-Meier curve to show the survival probability against days since diagnosis. 
+We will plot a Kaplan-Meier curve to show the survival probability against days since diagnosis.
 
 ```{r km}
 # kaplan meier curve
@@ -209,19 +210,17 @@ ggsurvplot(km_fit, data = surv_df, conf.int = TRUE, risk.table = TRUE)
 
 ## Cox Proportional Hazards Model
 
-It is not standard to fit a survival model with such a small sample size (n = 11). The model is included here for demonstration of workflow. 
+It is not standard to fit a survival model with such a small sample size (n = 11). The model is included here for demonstration of workflow.
 
 Here is the Cox PH model
 
-$$
-h(t|x) = h_0(t)e^{\beta x}
-$$ 
+$$h(t|x) = h_0(t)e^{\beta x}$$
 where:
 
-  - $x$ is age at onset
-  - $t$ is the days since diagnosis
-  - $h_0(t)$ is the unspecified baseline hazard function
-  - $\beta$ is the additive effect of age on the log-hazard
+- $x$ is age at onset
+- $t$ is the days since diagnosis
+- $h_0(t)$ is the unspecified baseline hazard function
+- $\beta$ is the additive effect of age on the log-hazard
 
 The hazard ratio for each unit increase in `onset_age` is obtained by exponentiating the coefficient:
 
@@ -249,4 +248,3 @@ gt(coxph_output %>%
 ### Interpretation
 
 The hazard ratio represents the multiplicative change in the hazard of death associated with a one-year increase in age at diagnosis. Given the small sample size, estimates are primarily illustrative.
-
